@@ -1,15 +1,19 @@
-# ==========================================
-# SMART GYM ASSISTANT
-# ==========================================
+import json
+import time
+import paho.mqtt.client as mqtt
+
+from database import save_iot_record
+
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+EQUIPMENT_TOPIC = "ai_gym/equipment"
+
 
 def get_workout_settings(goal, experience):
-
-    # Default settings
     intensity = "Moderate"
     resistance = "Medium"
     rest_time = 60
 
-    # Goal-based settings
     if goal == "Weight Loss":
         intensity = "High"
         resistance = "Medium"
@@ -25,12 +29,6 @@ def get_workout_settings(goal, experience):
         resistance = "Low"
         rest_time = 45
 
-    else:
-        intensity = "Moderate"
-        resistance = "Medium"
-        rest_time = 60
-
-    # Experience adjustment
     if experience == "Beginner":
         if intensity == "High":
             intensity = "Moderate"
@@ -50,7 +48,6 @@ def get_workout_settings(goal, experience):
 
 
 def get_equipment_status():
-
     return {
         "Treadmill": "Available",
         "Exercise Bike": "Available",
@@ -59,41 +56,100 @@ def get_equipment_status():
     }
 
 
-def smart_gym_assistant(goal, experience):
+def get_live_equipment_data(timeout=3):
+    latest_data = {"data": None}
 
-    settings = get_workout_settings(
-        goal,
-        experience
+    def on_message(client, userdata, message):
+        try:
+            data = json.loads(message.payload.decode())
+
+            # Save live IoT sensor data to MongoDB
+            save_iot_record(data)
+
+            userdata["data"] = data
+
+        except Exception:
+            userdata["data"] = None
+
+    client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION2,
+        client_id="ai-gym-smart-gym-reader"
     )
 
-    equipment = get_equipment_status()
+    client.user_data_set(latest_data)
+    client.on_message = on_message
+
+    try:
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.subscribe(EQUIPMENT_TOPIC)
+
+        client.loop_start()
+
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            if latest_data["data"] is not None:
+                break
+            time.sleep(0.1)
+
+        client.loop_stop()
+        client.disconnect()
+
+        return latest_data["data"]
+
+    except Exception as e:
+        print("MQTT reader error:", e)
+        return None
+
+
+def generate_live_recommendation(sensor_data):
+    if not sensor_data:
+        return {
+            "Live Status": "No sensor data received",
+            "Recommendation": "Start the MQTT sensor simulator."
+        }
+
+    heart_rate = sensor_data.get("heart_rate", 0)
+    intensity = sensor_data.get("intensity", "Unknown")
+    resistance = sensor_data.get("resistance", 0)
+
+    if heart_rate >= 140:
+        recommendation = (
+            "Heart rate is high. Reduce workout intensity "
+            "and take a longer rest."
+        )
+
+    elif heart_rate >= 120:
+        recommendation = (
+            "Heart rate is elevated. Maintain moderate intensity "
+            "and monitor your recovery."
+        )
+
+    else:
+        recommendation = (
+            "Heart rate is within the simulated target range. "
+            "Continue with controlled exercise."
+        )
 
     return {
-        "Settings": settings,
-        "Equipment": equipment
+        "Live Status": "Sensor data received",
+        "Equipment": sensor_data.get("equipment", "Unknown"),
+        "Heart Rate": heart_rate,
+        "Resistance": resistance,
+        "Sensor Intensity": intensity,
+        "Recommendation": recommendation
     }
 
 
-# ==========================================
-# Test the Smart Gym Assistant
-# ==========================================
+def smart_gym_assistant(goal, experience):
+    settings = get_workout_settings(goal, experience)
+    equipment = get_equipment_status()
 
-if __name__ == "__main__":
+    live_data = get_live_equipment_data()
+    live_recommendation = generate_live_recommendation(live_data)
 
-    result = smart_gym_assistant(
-        goal="Weight Loss",
-        experience="Beginner"
-    )
-
-    print("🤖 Smart Gym Assistant")
-    print("-------------------------")
-
-    print("\nWorkout Settings:")
-
-    for key, value in result["Settings"].items():
-        print(f"{key}: {value}")
-
-    print("\nEquipment Status:")
-
-    for equipment, status in result["Equipment"].items():
-        print(f"{equipment}: {status}")
+    return {
+        "Settings": settings,
+        "Equipment": equipment,
+        "Live Sensor Data": live_recommendation
+    }

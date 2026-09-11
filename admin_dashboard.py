@@ -2,6 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+from database import (
+    users_collection,
+    workouts_collection,
+    habit_collection,
+    performance_collection,
+    diet_collection,
+    iot_collection
+)
 
 # ==========================================
 # ADMIN DASHBOARD
@@ -23,48 +31,195 @@ st.divider()
 
 
 # ==========================================
-# DEMO FITNESS DATA
+# LOAD FITNESS DATA FROM MONGODB
 # ==========================================
 
-data = pd.DataFrame({
-    "User": [
-        "User 1",
-        "User 2",
-        "User 3",
-        "User 4",
-        "User 5",
-        "User 6",
-        "User 7",
-        "User 8"
-    ],
-    "Workout Days": [5, 4, 6, 3, 5, 2, 6, 4],
-    "Missed Days": [2, 3, 1, 4, 2, 5, 1, 3],
-    "Performance Score": [85, 72, 91, 65, 88, 58, 94, 76],
-    "BMI": [23.4, 26.1, 22.8, 28.3, 24.5, 30.1, 21.9, 25.7],
-    "Goal": [
-        "Weight Loss",
-        "Muscle Gain",
-        "Maintain Fitness",
-        "Weight Loss",
-        "Muscle Gain",
-        "Weight Loss",
-        "Muscle Gain",
-        "Maintain Fitness"
+users = list(users_collection.find())
+workouts = list(workouts_collection.find())
+habits = list(habit_collection.find())
+performances = list(performance_collection.find())
+diet_records = list(diet_collection.find())
+iot_records = list(iot_collection.find())
+
+
+# ==========================================
+# PREPARE USER ANALYTICS DATA
+# ==========================================
+
+user_rows = []
+
+for user in users:
+
+    user_id = user.get("_id")
+
+    user_name = user.get("name", "User")
+    user_goal = user.get("goal", "Maintain Fitness")
+
+    # -----------------------------
+    # Find this user's workouts
+    # -----------------------------
+
+    user_workouts = [
+        workout for workout in workouts
+        if workout.get("user_id") == user_id
     ]
-})
+
+    total_reps = 0
+
+    for workout in user_workouts:
+        reps = workout.get("reps", 0)
+
+        try:
+            total_reps += float(reps)
+        except (TypeError, ValueError):
+            pass
+
+    # -----------------------------
+    # Find this user's habit records
+    # -----------------------------
+
+    user_habits = [
+        habit for habit in habits
+        if habit.get("user_id") == user_id
+    ]
+
+    workout_days = 0
+    missed_days = 0
+
+    for habit in user_habits:
+        try:
+            workout_days += float(habit.get("workout_days", 0))
+        except (TypeError, ValueError):
+            pass
+
+        try:
+            missed_days += float(habit.get("missed_days", 0))
+        except (TypeError, ValueError):
+            pass
+
+    # -----------------------------
+    # Find this user's performance
+    # -----------------------------
+
+    user_performances = [
+        performance for performance in performances
+        if performance.get("user_id") == user_id
+    ]
+
+    performance_scores = []
+
+    for performance in user_performances:
+        try:
+            performance_scores.append(
+                float(performance.get("performance_score", 0))
+            )
+        except (TypeError, ValueError):
+            pass
+
+    if performance_scores:
+        average_performance = sum(performance_scores) / len(
+            performance_scores
+        )
+    else:
+        average_performance = 0
+
+    # -----------------------------
+    # Find this user's diet records
+    # -----------------------------
+
+    user_diets = [
+        diet for diet in diet_records
+        if diet.get("user_id") == user_id
+    ]
+
+    bmi_values = []
+
+    for diet in user_diets:
+        try:
+            bmi_values.append(
+                float(diet.get("bmi", 0))
+            )
+        except (TypeError, ValueError):
+            pass
+
+    if bmi_values:
+        average_bmi = sum(bmi_values) / len(bmi_values)
+    else:
+        average_bmi = 0
+
+    # -----------------------------
+    # Calculate consistency
+    # -----------------------------
+
+    total_days = workout_days + missed_days
+
+    if total_days > 0:
+        consistency = (
+            workout_days / total_days
+        ) * 100
+    else:
+        consistency = 0
+
+    # -----------------------------
+    # Add user row
+    # -----------------------------
+
+    user_rows.append({
+        "User": user_name,
+        "Goal": user_goal,
+        "Workout Days": workout_days,
+        "Missed Days": missed_days,
+        "Total Reps": total_reps,
+        "Performance Score": round(
+            average_performance, 1
+        ),
+        "BMI": round(
+            average_bmi, 1
+        ),
+        "Consistency": round(
+            consistency, 1
+        )
+    })
 
 
-# ==========================================
-# CALCULATE CONSISTENCY
-# ==========================================
+# Convert user analytics to DataFrame
 
-data["Consistency"] = (
-    data["Workout Days"] /
-    (data["Workout Days"] + data["Missed Days"])
-) * 100
+data = pd.DataFrame(user_rows)
 
-data["Consistency"] = data["Consistency"].round(1)
 
+# Empty database protection
+
+if data.empty:
+    data = pd.DataFrame(
+        columns=[
+            "User",
+            "Goal",
+            "Workout Days",
+            "Missed Days",
+            "Total Reps",
+            "Performance Score",
+            "BMI",
+            "Consistency"
+        ]
+    )
+
+
+# Make sure numeric columns are numeric
+
+numeric_columns = [
+    "Workout Days",
+    "Missed Days",
+    "Total Reps",
+    "Performance Score",
+    "BMI",
+    "Consistency"
+]
+
+for column in numeric_columns:
+    data[column] = pd.to_numeric(
+        data[column],
+        errors="coerce"
+    ).fillna(0)
 
 # ==========================================
 # SIDEBAR FILTER
@@ -203,6 +358,96 @@ st.plotly_chart(
     use_container_width=True
 )
 
+# ==============================
+# IoT SENSOR ANALYTICS
+# ==============================
+
+st.markdown("---")
+st.header("📡 IoT Sensor Analytics")
+
+if iot_records:
+    heart_rates = []
+    resistances = []
+    equipment_names = []
+
+    for record in iot_records:
+        try:
+            heart_rates.append(float(record.get("heart_rate", 0)))
+        except (TypeError, ValueError):
+            pass
+
+        try:
+            resistances.append(float(record.get("resistance", 0)))
+        except (TypeError, ValueError):
+            pass
+
+        equipment = record.get("equipment")
+        if equipment:
+            equipment_names.append(equipment)
+
+    average_heart_rate = (
+        sum(heart_rates) / len(heart_rates)
+        if heart_rates else 0
+    )
+
+    average_resistance = (
+        sum(resistances) / len(resistances)
+        if resistances else 0
+    )
+
+    iot_col1, iot_col2, iot_col3 = st.columns(3)
+
+    with iot_col1:
+        st.metric(
+            "IoT Sensor Records",
+            len(iot_records)
+        )
+
+    with iot_col2:
+        st.metric(
+            "Average Heart Rate",
+            f"{average_heart_rate:.1f} BPM"
+        )
+
+    with iot_col3:
+        st.metric(
+            "Average Resistance",
+            f"{average_resistance:.1f}"
+        )
+
+    if equipment_names:
+        equipment_df = pd.DataFrame({
+            "Equipment": equipment_names
+        })
+
+        equipment_counts = (
+            equipment_df["Equipment"]
+            .value_counts()
+            .reset_index()
+        )
+
+        equipment_counts.columns = [
+            "Equipment",
+            "Records"
+        ]
+
+        fig_iot = px.bar(
+            equipment_counts,
+            x="Equipment",
+            y="Records",
+            title="IoT Equipment Usage"
+        )
+
+        st.plotly_chart(
+            fig_iot,
+            use_container_width=True
+        )
+
+else:
+    st.info(
+        "No IoT sensor records available yet. "
+        "Run the MQTT sensor simulator to collect data."
+    )
 
 # ==========================================
 # MODULE STATUS

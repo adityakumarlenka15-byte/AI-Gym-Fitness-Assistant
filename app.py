@@ -549,7 +549,36 @@ for item, status in equipment.items():
     if status == "Available":
         st.success(f"✅ {item}: {status}")
     else:
-        st.warning(f"⚠️ {item}: {status}")    
+        st.warning(f"⚠️ {item}: {status}")
+        
+st.subheader("📡 Live IoT Equipment Data")
+
+live_data = smart_result.get("Live Sensor Data", {})
+
+if live_data.get("Live Status") == "Sensor data received":
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Equipment", live_data.get("Equipment", "Unknown"))
+
+    with col2:
+        st.metric("Heart Rate", f"{live_data.get('Heart Rate', 0)} BPM")
+
+    with col3:
+        st.metric("Resistance", live_data.get("Resistance", 0))
+
+    with col4:
+        st.metric("Intensity", live_data.get("Sensor Intensity", "Unknown"))
+
+    st.info(
+        f"💡 **Smart Recommendation:** "
+        f"{live_data.get('Recommendation', 'No recommendation available.')}"
+    )
+else:
+    st.warning(
+        "No live MQTT sensor data received. "
+        "Make sure the MQTT simulator is running."
+    )            
 
 # ==============================
 # AI GYM TRAINER
