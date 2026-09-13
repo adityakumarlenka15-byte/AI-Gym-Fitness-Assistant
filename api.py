@@ -1,15 +1,22 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+import subprocess
+import sys
+import os
 
 from diet_coach import diet_coach
 from habit_tracker import habit_tracker
 from gym_recommender import recommend_gyms, create_weekly_plan
 from smart_gym_assistant import smart_gym_assistant
+from gym_buddy import gym_buddy
+from performance import analyze_performance
 
 
-# ==========================================
-# FASTAPI BACKEND
-# ==========================================
+# =========================================================
+# FASTAPI APP
+# =========================================================
 
 app = FastAPI(
     title="AI Gym & Fitness Assistant API",
@@ -18,9 +25,29 @@ app = FastAPI(
 )
 
 
-# ==========================================
-# DATA MODELS
-# ==========================================
+# =========================================================
+# CORS
+# =========================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# =========================================================
+# REQUEST MODELS
+# =========================================================
 
 class DietRequest(BaseModel):
     weight: float
@@ -39,9 +66,19 @@ class GymRequest(BaseModel):
     experience: str
 
 
-# ==========================================
-# HOME ENDPOINT
-# ==========================================
+class GymBuddyRequest(BaseModel):
+    message: str
+
+
+class PerformanceRequest(BaseModel):
+    form_score: float
+    rep_quality: float
+    consistency: float
+
+
+# =========================================================
+# HOME
+# =========================================================
 
 @app.get("/")
 def home():
@@ -51,9 +88,9 @@ def home():
     }
 
 
-# ==========================================
+# =========================================================
 # HEALTH CHECK
-# ==========================================
+# =========================================================
 
 @app.get("/health")
 def health_check():
@@ -62,16 +99,18 @@ def health_check():
     }
 
 
-# ==========================================
-# DIET COACH API
-# ==========================================
+# =========================================================
+# AI DIETICIAN
+# =========================================================
 
 @app.post("/diet")
 def diet_recommendation(request: DietRequest):
 
-    # Map dashboard goals to Diet Coach goals
     if request.goal == "Weight Loss":
         diet_goal = "Weight Loss"
+
+    elif request.goal == "Weight Gain":
+        diet_goal = "Weight Gain"
 
     elif request.goal == "Muscle Gain":
         diet_goal = "Weight Gain"
@@ -89,9 +128,9 @@ def diet_recommendation(request: DietRequest):
     return result
 
 
-# ==========================================
-# HABIT TRACKER API
-# ==========================================
+# =========================================================
+# HABIT TRACKER
+# =========================================================
 
 @app.post("/habit")
 def habit_analysis(request: HabitRequest):
@@ -104,9 +143,9 @@ def habit_analysis(request: HabitRequest):
     return result
 
 
-# ==========================================
-# GYM RECOMMENDER API
-# ==========================================
+# =========================================================
+# GYM PLANNER
+# =========================================================
 
 @app.post("/gym-recommendation")
 def gym_recommendation(request: GymRequest):
@@ -126,9 +165,9 @@ def gym_recommendation(request: GymRequest):
     }
 
 
-# ==========================================
-# SMART GYM ASSISTANT API
-# ==========================================
+# =========================================================
+# SMART GYM
+# =========================================================
 
 @app.post("/smart-gym")
 def smart_gym(request: GymRequest):
@@ -139,3 +178,56 @@ def smart_gym(request: GymRequest):
     )
 
     return result
+
+
+# =========================================================
+# VIRTUAL GYM BUDDY
+# =========================================================
+
+@app.post("/gym-buddy")
+def gym_buddy_chat(request: GymBuddyRequest):
+
+    response = gym_buddy(
+        request.message
+    )
+
+    return {
+        "response": response
+    }
+
+@app.post("/performance")
+def performance_analysis(request: PerformanceRequest):
+    result = analyze_performance(
+        form_score=request.form_score,
+        rep_quality=request.rep_quality,
+        consistency=request.consistency
+    )
+
+    return result
+
+# =========================================================
+# AI GYM TRAINER
+# =========================================================
+
+@app.post("/start-trainer")
+def start_trainer():
+
+    trainer_path = os.path.join(
+        os.path.dirname(
+            os.path.abspath(__file__)
+        ),
+        "workout_trainer.py"
+    )
+
+    subprocess.Popen(
+        [
+            sys.executable,
+            trainer_path
+        ],
+        cwd=os.path.dirname(trainer_path)
+    )
+
+    return {
+        "status": "success",
+        "message": "AI Gym Trainer started"
+    }
