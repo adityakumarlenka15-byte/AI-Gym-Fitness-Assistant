@@ -12,6 +12,8 @@ from gym_recommender import recommend_gyms, create_weekly_plan
 from smart_gym_assistant import smart_gym_assistant
 from gym_buddy import gym_buddy
 from performance import analyze_performance
+from fitness_predictor import predict_fitness_level
+from pytorch_predictor import predict_fitness_level as pytorch_predict_fitness_level
 
 
 # =========================================================
@@ -74,6 +76,18 @@ class PerformanceRequest(BaseModel):
     form_score: float
     rep_quality: float
     consistency: float
+
+
+class FitnessPredictionRequest(BaseModel):
+    workout_duration: float
+    workout_days: int
+    fitness_score: float
+
+
+class PyTorchFitnessPredictionRequest(BaseModel):
+    workout_duration: float
+    workout_days: int
+    fitness_score: float
 
 
 # =========================================================
@@ -230,4 +244,30 @@ def start_trainer():
     return {
         "status": "success",
         "message": "AI Gym Trainer started"
+    }
+
+@app.post("/fitness-prediction")
+def fitness_prediction(request: FitnessPredictionRequest):
+    level = predict_fitness_level(
+        workout_duration=request.workout_duration,
+        workout_days=request.workout_days,
+        fitness_score=request.fitness_score
+    )
+
+    return {
+        "Predicted Fitness Level": level
+    }
+
+@app.post("/pytorch-fitness-prediction")
+def pytorch_fitness_prediction(request: PyTorchFitnessPredictionRequest):
+
+    level = pytorch_predict_fitness_level(
+        workout_duration=request.workout_duration,
+        workout_days=request.workout_days,
+        fitness_score=request.fitness_score
+    )
+
+    return {
+        "Predicted Fitness Level": level,
+        "Model": "PyTorch Neural Network"
     }

@@ -1,3 +1,6 @@
 venv/
+tf_venv/
+torch_venv/
 __pycache__/
 *.pyc
+.env

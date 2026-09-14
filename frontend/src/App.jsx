@@ -11,6 +11,7 @@ import {
   startTrainer,
   sendGymBuddyMessage,
   getPerformanceAnalysis,
+  getPyTorchFitnessPrediction,
 } from "./api";
 
 function App() {
@@ -25,15 +26,16 @@ function App() {
   }, []);
 
   const modules = [
-    "Dashboard",
-    "AI Gym Trainer",
-    "AI Dietician",
-    "Habit Tracker",
-    "Gym Buddy",
-    "Performance",
-    "Gym Planner",
-    "Smart Gym",
-  ];
+  "Dashboard",
+  "AI Gym Trainer",
+  "AI Dietician",
+  "Habit Tracker",
+  "Gym Buddy",
+  "Performance",
+  "Gym Planner",
+  "Smart Gym",
+  "PyTorch Fitness AI",
+];
 
   return (
     <div className="app">
@@ -67,6 +69,7 @@ function App() {
               {module === "Performance" && "📊"}
               {module === "Gym Planner" && "🗓️"}
               {module === "Smart Gym" && "📡"}
+              {module === "PyTorch Fitness AI" && "🧠"}
 
               <span>{module}</span>
             </button>
@@ -386,6 +389,16 @@ function ModulePage({ module }) {
   const [smartGymLoading, setSmartGymLoading] = useState(false);
   const [smartGymError, setSmartGymError] = useState("");
 
+  /* ---------------- PYTORCH FITNESS PREDICTION STATES ---------------- */
+
+const [pytorchDuration, setPytorchDuration] = useState(35);
+const [pytorchWorkoutDays, setPytorchWorkoutDays] = useState(5);
+const [pytorchFitnessScore, setPytorchFitnessScore] = useState(72);
+
+const [pytorchResult, setPytorchResult] = useState(null);
+const [pytorchLoading, setPytorchLoading] = useState(false);
+const [pytorchError, setPytorchError] = useState("");
+
 
   /* =========================================================
      DIET API
@@ -604,6 +617,28 @@ async function calculateSmartGym() {
     );
   } finally {
     setSmartGymLoading(false);
+  }
+}
+
+async function calculatePyTorchFitness() {
+  setPytorchLoading(true);
+  setPytorchError("");
+  setPytorchResult(null);
+
+  try {
+    const data = await getPyTorchFitnessPrediction({
+      workout_duration: Number(pytorchDuration),
+      workout_days: Number(pytorchWorkoutDays),
+      fitness_score: Number(pytorchFitnessScore),
+    });
+
+    setPytorchResult(data);
+  } catch (error) {
+    setPytorchError(
+      "Could not connect to PyTorch Fitness Predictor."
+    );
+  } finally {
+    setPytorchLoading(false);
   }
 }
 
@@ -1197,6 +1232,180 @@ async function calculateSmartGym() {
   );
 }
 
+  /* =========================================================
+   PYTORCH FITNESS AI PAGE
+========================================================= */
+
+if (module === "PyTorch Fitness AI") {
+  return (
+    <div className="module-page">
+
+      <div className="module-header">
+        <div>
+          <span className="eyebrow">
+            PYTORCH NEURAL NETWORK
+          </span>
+
+          <h2>PyTorch Fitness AI</h2>
+
+          <p>
+            Predict your fitness level using a
+            PyTorch neural-network model.
+          </p>
+        </div>
+      </div>
+
+      <div className="diet-layout">
+
+        {/* INPUT FORM */}
+
+        <div className="coming-card">
+
+          <div className="coming-icon">🧠</div>
+
+          <h3>Fitness Prediction</h3>
+
+          <p>
+            Enter your workout information to predict
+            your current fitness level.
+          </p>
+
+          <label>
+            Workout Duration (minutes)
+          </label>
+
+          <input
+            type="number"
+            min="1"
+            value={pytorchDuration}
+            onChange={(event) =>
+              setPytorchDuration(event.target.value)
+            }
+          />
+
+          <label>
+            Workout Days per Week
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            max="7"
+            value={pytorchWorkoutDays}
+            onChange={(event) =>
+              setPytorchWorkoutDays(event.target.value)
+            }
+          />
+
+          <label>
+            Fitness Score
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={pytorchFitnessScore}
+            onChange={(event) =>
+              setPytorchFitnessScore(event.target.value)
+            }
+          />
+
+          <button
+            className="primary-btn diet-btn"
+            onClick={calculatePyTorchFitness}
+            disabled={pytorchLoading}
+          >
+            {pytorchLoading
+              ? "Predicting..."
+              : "🧠 Predict Fitness Level"}
+          </button>
+
+          {pytorchError && (
+            <p className="error-message">
+              {pytorchError}
+            </p>
+          )}
+
+        </div>
+
+
+        {/* RESULT */}
+
+        <div className="coming-card result-card">
+
+          <div className="coming-icon">🏆</div>
+
+          <h3>PyTorch Prediction</h3>
+
+          {!pytorchResult ? (
+            <p>
+              Your predicted fitness level will appear
+              here after analysis.
+            </p>
+          ) : (
+            <>
+              <div className="result-stats">
+
+                <div>
+                  <span>
+                    Predicted Level
+                  </span>
+
+                  <strong>
+                    {pytorchResult[
+                      "Predicted Fitness Level"
+                    ]}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    AI Model
+                  </span>
+
+                  <strong>
+                    PyTorch
+                  </strong>
+                </div>
+
+              </div>
+
+              <div className="meal">
+                <strong>Model Type</strong>
+
+                <p>
+                  Neural Network
+                </p>
+              </div>
+
+              <div className="meal">
+                <strong>Input Data</strong>
+
+                <p>
+                  {pytorchDuration} min workout ·{" "}
+                  {pytorchWorkoutDays} days/week ·{" "}
+                  {pytorchFitnessScore} fitness score
+                </p>
+              </div>
+
+              <p className="disclaimer">
+                This prediction is a demonstration
+                generated by a small project-trained
+                PyTorch model and should not be treated
+                as a medical or professional fitness
+                assessment.
+              </p>
+            </>
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
 
   /* =========================================================
      AI DIETICIAN PAGE

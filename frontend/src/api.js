@@ -119,3 +119,22 @@ export async function getPerformanceAnalysis(data) {
 
   return response.json();
 }
+
+export async function getPyTorchFitnessPrediction(data) {
+  const response = await fetch(
+    `${API_URL}/pytorch-fitness-prediction`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("PyTorch fitness prediction request failed");
+  }
+
+  return response.json();
+}
