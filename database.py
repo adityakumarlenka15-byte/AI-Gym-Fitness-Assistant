@@ -121,10 +121,6 @@ def save_performance_for_user(user_id, performance_data):
         print("Error saving user performance:", e)
         return None
 
-def save_iot_record(iot_data):
-    try:
-        result = iot_collection.insert_one(iot_data)
-        return str(result.inserted_id)
-    except Exception as e:
-        print("Error saving IoT record:", e)
-        return None                                
+def save_iot_record(data):
+    record = dict(data)
+    iot_collection.insert_one(record)                                

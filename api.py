@@ -9,11 +9,12 @@ import os
 from diet_coach import diet_coach
 from habit_tracker import habit_tracker
 from gym_recommender import recommend_gyms, create_weekly_plan
-from smart_gym_assistant import smart_gym_assistant
+from smart_gym_assistant import smart_gym_assistant, generate_live_recommendation
 from gym_buddy import gym_buddy
 from performance import analyze_performance
 from fitness_predictor import predict_fitness_level
 from pytorch_predictor import predict_fitness_level as pytorch_predict_fitness_level
+from database import save_iot_record
 
 
 # =========================================================
@@ -270,4 +271,24 @@ def pytorch_fitness_prediction(request: PyTorchFitnessPredictionRequest):
     return {
         "Predicted Fitness Level": level,
         "Model": "PyTorch Neural Network"
+    }
+
+@app.post("/iot-data")
+def receive_iot_data(data: dict):
+    save_iot_record(data)
+
+    recommendation = generate_live_recommendation(data)
+
+    sensor_data = {
+        "equipment": data.get("equipment"),
+        "heart_rate": data.get("heart_rate"),
+        "resistance": data.get("resistance"),
+        "intensity": data.get("intensity"),
+        "timestamp": data.get("timestamp"),
+    }
+
+    return {
+        "status": "IoT data received",
+        "sensor_data": sensor_data,
+        "recommendation": recommendation,
     }
